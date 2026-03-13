@@ -2,12 +2,14 @@ import { describe, expect, it, vi } from "vitest";
 import type { CoreConfig } from "../../types.js";
 import type { MatrixAuth } from "../client.js";
 import type { MatrixClient } from "../sdk.js";
+import type { MatrixVerificationSummary } from "../sdk/verification-manager.js";
 import { registerMatrixMonitorEvents } from "./events.js";
 import type { MatrixRawEvent } from "./types.js";
 import { EventType } from "./types.js";
 
 type RoomEventListener = (roomId: string, event: MatrixRawEvent) => void;
 type FailedDecryptListener = (roomId: string, event: MatrixRawEvent, error: Error) => Promise<void>;
+type VerificationSummaryListener = (summary: MatrixVerificationSummary) => void;
 
 function getSentNoticeBody(sendMessage: ReturnType<typeof vi.fn>, index = 0): string {
   const calls = sendMessage.mock.calls as unknown[][];
@@ -107,6 +109,9 @@ function createHarness(params?: {
     roomMessageListener: listeners.get("room.message") as RoomEventListener | undefined,
     failedDecryptListener: listeners.get("room.failed_decryption") as
       | FailedDecryptListener
+      | undefined,
+    verificationSummaryListener: listeners.get("verification.summary") as
+      | VerificationSummaryListener
       | undefined,
   };
 }
@@ -240,6 +245,50 @@ describe("registerMatrixMonitorEvents verification routing", () => {
       expect(bodies.some((body) => body.includes("SAS emoji:"))).toBe(true);
       expect(bodies.some((body) => body.includes("SAS decimal: 6158 1986 3513"))).toBe(true);
     });
+  });
+
+  it("posts SAS notices directly from verification summary updates", async () => {
+    const { sendMessage, verificationSummaryListener } = createHarness({
+      joinedMembersByRoom: {
+        "!dm:example.org": ["@alice:example.org", "@bot:example.org"],
+      },
+    });
+    if (!verificationSummaryListener) {
+      throw new Error("verification.summary listener was not registered");
+    }
+
+    verificationSummaryListener({
+      id: "verification-direct",
+      roomId: "!dm:example.org",
+      otherUserId: "@alice:example.org",
+      isSelfVerification: false,
+      initiatedByMe: false,
+      phase: 3,
+      phaseName: "started",
+      pending: true,
+      methods: ["m.sas.v1"],
+      canAccept: false,
+      hasSas: true,
+      sas: {
+        decimal: [6158, 1986, 3513],
+        emoji: [
+          ["🎁", "Gift"],
+          ["🌍", "Globe"],
+          ["🐴", "Horse"],
+        ],
+      },
+      hasReciprocateQr: false,
+      completed: false,
+      createdAt: new Date("2026-02-25T21:42:54.000Z").toISOString(),
+      updatedAt: new Date("2026-02-25T21:42:55.000Z").toISOString(),
+    });
+
+    await vi.waitFor(() => {
+      expect(sendMessage).toHaveBeenCalledTimes(1);
+    });
+    const body = getSentNoticeBody(sendMessage, 0);
+    expect(body).toContain("Matrix verification SAS with @alice:example.org:");
+    expect(body).toContain("SAS decimal: 6158 1986 3513");
   });
 
   it("retries SAS notice lookup when start arrives before SAS payload is available", async () => {

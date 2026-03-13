@@ -33,6 +33,8 @@ export type MatrixVerificationSummary = {
   updatedAt: string;
 };
 
+type MatrixVerificationSummaryListener = (summary: MatrixVerificationSummary) => void;
+
 export type MatrixShowSasCallbacks = {
   sas: {
     decimal?: [number, number, number];
@@ -116,6 +118,7 @@ export class MatrixVerificationManager {
   private verificationSessionCounter = 0;
   private readonly trackedVerificationRequests = new WeakSet<object>();
   private readonly trackedVerificationVerifiers = new WeakSet<object>();
+  private readonly summaryListeners = new Set<MatrixVerificationSummaryListener>();
 
   private readRequestValue<T>(
     request: MatrixVerificationRequestLike,
@@ -173,8 +176,16 @@ export class MatrixVerificationManager {
     }
   }
 
+  private emitVerificationSummary(session: MatrixVerificationSession): void {
+    const summary = this.buildVerificationSummary(session);
+    for (const listener of this.summaryListeners) {
+      listener(summary);
+    }
+  }
+
   private touchVerificationSession(session: MatrixVerificationSession): void {
     session.updatedAtMs = Date.now();
+    this.emitVerificationSummary(session);
   }
 
   private clearSasAutoConfirmTimer(session: MatrixVerificationSession): void {
@@ -400,6 +411,13 @@ export class MatrixVerificationManager {
       });
   }
 
+  onSummaryChanged(listener: MatrixVerificationSummaryListener): () => void {
+    this.summaryListeners.add(listener);
+    return () => {
+      this.summaryListeners.delete(listener);
+    };
+  }
+
   trackVerificationRequest(request: MatrixVerificationRequestLike): MatrixVerificationSummary {
     this.pruneVerificationSessions(Date.now());
     const txId = this.readRequestValue(request, () => request.transactionId?.trim(), "");
@@ -441,6 +459,7 @@ export class MatrixVerificationManager {
       this.attachVerifierToVerificationSession(session, verifier);
     }
     this.maybeAutoStartInboundSas(session);
+    this.emitVerificationSummary(session);
     return this.buildVerificationSummary(session);
   }
 

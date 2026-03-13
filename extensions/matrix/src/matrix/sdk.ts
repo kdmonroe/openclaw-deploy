@@ -29,7 +29,10 @@ import type {
   MatrixRawEvent,
   MessageEventContent,
 } from "./sdk/types.js";
-import { MatrixVerificationManager } from "./sdk/verification-manager.js";
+import {
+  MatrixVerificationManager,
+  type MatrixVerificationSummary,
+} from "./sdk/verification-manager.js";
 import { isMatrixDeviceOwnerVerified } from "./sdk/verification-status.js";
 
 export { ConsoleLogger, LogService };
@@ -246,6 +249,9 @@ export class MatrixClient {
       verificationManager: this.verificationManager,
       recoveryKeyStore: this.recoveryKeyStore,
       decryptBridge: this.decryptBridge,
+    });
+    this.verificationManager.onSummaryChanged((summary: MatrixVerificationSummary) => {
+      this.emitter.emit("verification.summary", summary);
     });
 
     if (this.encryptionEnabled) {

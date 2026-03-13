@@ -308,7 +308,40 @@ export function createMatrixVerificationEventRouter(params: {
   const routedVerificationEvents = new Set<string>();
   const routedVerificationSasFingerprints = new Set<string>();
 
-  return (roomId: string, event: MatrixRawEvent): boolean => {
+  async function routeVerificationSummary(summary: MatrixVerificationSummaryLike): Promise<void> {
+    const roomId = trimMaybeString(summary.roomId);
+    if (!roomId || !isActiveVerificationSummary(summary)) {
+      return;
+    }
+    if (
+      !(await isStrictDirectRoom({
+        client: params.client,
+        roomId,
+        remoteUserId: summary.otherUserId,
+      }))
+    ) {
+      params.logVerboseMessage(
+        `matrix: ignoring verification summary outside strict DM room=${roomId} sender=${summary.otherUserId}`,
+      );
+      return;
+    }
+    const sasNotice = formatVerificationSasNotice(summary);
+    if (!sasNotice) {
+      return;
+    }
+    const sasFingerprint = `${summary.id}:${JSON.stringify(summary.sas)}`;
+    if (!trackBounded(routedVerificationSasFingerprints, sasFingerprint)) {
+      return;
+    }
+    await sendVerificationNotice({
+      client: params.client,
+      roomId,
+      body: sasNotice,
+      logVerboseMessage: params.logVerboseMessage,
+    });
+  }
+
+  function routeVerificationEvent(roomId: string, event: MatrixRawEvent): boolean {
     const senderId = trimMaybeString(event?.sender);
     if (!senderId) {
       return false;
@@ -373,5 +406,10 @@ export function createMatrixVerificationEventRouter(params: {
     });
 
     return true;
+  }
+
+  return {
+    routeVerificationEvent,
+    routeVerificationSummary,
   };
 }

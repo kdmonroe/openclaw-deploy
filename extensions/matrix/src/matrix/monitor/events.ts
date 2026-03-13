@@ -56,7 +56,7 @@ export function registerMatrixMonitorEvents(params: {
     formatNativeDependencyHint,
     onRoomMessage,
   } = params;
-  const routeVerificationEvent = createMatrixVerificationEventRouter({
+  const { routeVerificationEvent, routeVerificationSummary } = createMatrixVerificationEventRouter({
     client,
     logVerboseMessage,
   });
@@ -105,6 +105,10 @@ export function registerMatrixMonitorEvents(params: {
       );
     },
   );
+
+  client.on("verification.summary", (summary) => {
+    void routeVerificationSummary(summary);
+  });
 
   client.on("room.invite", (roomId: string, event: MatrixRawEvent) => {
     directTracker?.invalidateRoom(roomId);

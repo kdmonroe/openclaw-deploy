@@ -209,6 +209,52 @@ describe("MatrixVerificationManager", () => {
     expect(manager.getVerificationSas(tracked.id).decimal).toEqual([6158, 1986, 3513]);
   });
 
+  it("emits summary updates when SAS becomes available", async () => {
+    const verify = vi.fn(async () => {});
+    const verifier = new MockVerifier(
+      {
+        sas: {
+          decimal: [6158, 1986, 3513],
+          emoji: [
+            ["gift", "Gift"],
+            ["globe", "Globe"],
+            ["horse", "Horse"],
+          ],
+        },
+        confirm: vi.fn(async () => {}),
+        mismatch: vi.fn(),
+        cancel: vi.fn(),
+      },
+      null,
+      verify,
+    );
+    const request = new MockVerificationRequest({
+      transactionId: "txn-summary-listener",
+      roomId: "!dm:example.org",
+      verifier: undefined,
+    });
+    const manager = new MatrixVerificationManager();
+    const summaries: ReturnType<typeof manager.listVerifications> = [];
+    manager.onSummaryChanged((summary) => {
+      summaries.push(summary);
+    });
+
+    manager.trackVerificationRequest(request);
+    request.verifier = verifier;
+    request.emit(VerificationRequestEvent.Change);
+
+    await vi.waitFor(() => {
+      expect(
+        summaries.some(
+          (summary) =>
+            summary.transactionId === "txn-summary-listener" &&
+            summary.roomId === "!dm:example.org" &&
+            summary.hasSas,
+        ),
+      ).toBe(true);
+    });
+  });
+
   it("auto-starts inbound SAS when request becomes ready without a verifier", async () => {
     const verify = vi.fn(async () => {});
     const verifier = new MockVerifier(
