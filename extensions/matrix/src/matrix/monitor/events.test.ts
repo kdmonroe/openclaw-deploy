@@ -241,6 +241,68 @@ describe("registerMatrixMonitorEvents verification routing", () => {
     });
   });
 
+  it("retries SAS notice lookup when start arrives before SAS payload is available", async () => {
+    vi.useFakeTimers();
+    const verifications: Array<{
+      id: string;
+      transactionId?: string;
+      otherUserId: string;
+      updatedAt?: string;
+      sas?: {
+        decimal?: [number, number, number];
+        emoji?: Array<[string, string]>;
+      };
+    }> = [
+      {
+        id: "verification-race",
+        transactionId: "$req-race",
+        updatedAt: new Date("2026-02-25T21:42:54.000Z").toISOString(),
+        otherUserId: "@alice:example.org",
+      },
+    ];
+    const { sendMessage, roomEventListener } = createHarness({
+      joinedMembersByRoom: {
+        "!dm:example.org": ["@alice:example.org", "@bot:example.org"],
+      },
+      verifications,
+    });
+
+    try {
+      roomEventListener("!dm:example.org", {
+        event_id: "$start-race",
+        sender: "@alice:example.org",
+        type: "m.key.verification.start",
+        origin_server_ts: Date.now(),
+        content: {
+          "m.relates_to": { event_id: "$req-race" },
+        },
+      });
+
+      await vi.advanceTimersByTimeAsync(500);
+      verifications[0] = {
+        ...verifications[0]!,
+        sas: {
+          decimal: [1234, 5678, 9012],
+          emoji: [
+            ["🚀", "Rocket"],
+            ["🦋", "Butterfly"],
+            ["📕", "Book"],
+          ],
+        },
+      };
+      await vi.advanceTimersByTimeAsync(500);
+
+      await vi.waitFor(() => {
+        const bodies = (sendMessage.mock.calls as unknown[][]).map((call) =>
+          String((call[1] as { body?: string } | undefined)?.body ?? ""),
+        );
+        expect(bodies.some((body) => body.includes("SAS emoji:"))).toBe(true);
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("ignores verification notices in unrelated non-DM rooms", async () => {
     const { sendMessage, roomEventListener } = createHarness({
       joinedMembersByRoom: {

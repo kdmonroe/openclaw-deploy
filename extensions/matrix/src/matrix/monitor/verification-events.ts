@@ -9,6 +9,7 @@ import {
 } from "./verification-utils.js";
 
 const MAX_TRACKED_VERIFICATION_EVENTS = 1024;
+const SAS_NOTICE_RETRY_DELAY_MS = 750;
 
 type MatrixVerificationStage = "request" | "ready" | "start" | "cancel" | "done" | "other";
 
@@ -225,6 +226,37 @@ async function resolveVerificationSummaryForSignal(
   return activeByUser.length === 1 ? (activeByUser[0] ?? null) : null;
 }
 
+async function resolveVerificationSasNoticeForSignal(
+  client: MatrixClient,
+  params: {
+    roomId: string;
+    event: MatrixRawEvent;
+    senderId: string;
+    flowId: string | null;
+    stage: MatrixVerificationStage;
+  },
+): Promise<{ summary: MatrixVerificationSummaryLike | null; sasNotice: string | null }> {
+  const summary = await resolveVerificationSummaryForSignal(client, params);
+  const immediateNotice =
+    summary && isActiveVerificationSummary(summary) ? formatVerificationSasNotice(summary) : null;
+  if (immediateNotice || (params.stage !== "ready" && params.stage !== "start")) {
+    return {
+      summary,
+      sasNotice: immediateNotice,
+    };
+  }
+
+  await new Promise((resolve) => setTimeout(resolve, SAS_NOTICE_RETRY_DELAY_MS));
+  const retriedSummary = await resolveVerificationSummaryForSignal(client, params);
+  return {
+    summary: retriedSummary,
+    sasNotice:
+      retriedSummary && isActiveVerificationSummary(retriedSummary)
+        ? formatVerificationSasNotice(retriedSummary)
+        : null,
+  };
+}
+
 function trackBounded(set: Set<string>, value: string): boolean {
   if (!value || set.has(value)) {
     return false;
@@ -298,16 +330,13 @@ export function createMatrixVerificationEventRouter(params: {
       }
 
       const stageNotice = formatVerificationStageNotice({ stage: signal.stage, senderId, event });
-      const summary = await resolveVerificationSummaryForSignal(params.client, {
+      const { summary, sasNotice } = await resolveVerificationSasNoticeForSignal(params.client, {
         roomId,
         event,
         senderId,
         flowId,
-      }).catch(() => null);
-      const sasNotice =
-        summary && isActiveVerificationSummary(summary)
-          ? formatVerificationSasNotice(summary)
-          : null;
+        stage: signal.stage,
+      }).catch(() => ({ summary: null, sasNotice: null }));
 
       const notices: string[] = [];
       if (stageNotice) {
