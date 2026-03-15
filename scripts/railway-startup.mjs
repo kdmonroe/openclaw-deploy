@@ -189,6 +189,25 @@ if (existsSync(WORKSPACE_TARGET)) {
     console.log(`[startup] created symlink ${WORKSPACE_LINK} → ${WORKSPACE_TARGET}`);
   }
 }
+// Symlink coaching agent workspaces from ephemeral home to persistent volume
+for (const agent of ["kaytoo", "ap5", "threepio", "huyang", "villagence"]) {
+  const target = `/data/.openclaw/workspace-${agent}`;
+  const link = `${HOME_OPENCLAW}/workspace-${agent}`;
+  if (existsSync(target)) {
+    try {
+      const stat = lstatSync(link);
+      if (!stat.isSymbolicLink()) {
+        rmSync(link, { recursive: true, force: true });
+        symlinkSync(target, link);
+        console.log(`[startup] symlinked ${link} → ${target}`);
+      }
+    } catch {
+      symlinkSync(target, link);
+      console.log(`[startup] symlinked ${link} → ${target}`);
+    }
+  }
+}
+
 // Move LCM database to persistent volume if it landed in the ephemeral home dir
 const LCM_DB_EPHEMERAL = `${HOME_OPENCLAW}/lcm.db`;
 const LCM_DB_PERSISTENT = "/data/.openclaw/lcm.db";
