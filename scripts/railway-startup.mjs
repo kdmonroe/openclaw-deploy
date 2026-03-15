@@ -90,6 +90,29 @@ if (existsSync(CONFIG)) {
       changed = true;
     }
 
+    // Throttle web search to stay within Brave free plan limits (1 req/sec, 2000/month)
+    // Increase cache TTL to 6 hours and reduce max results per query
+    if (!config.tools) config.tools = {};
+    if (!config.tools.web) config.tools.web = {};
+    if (!config.tools.web.search) config.tools.web.search = {};
+    const search = config.tools.web.search;
+    if (!search.cacheTtlMinutes || search.cacheTtlMinutes < 360) {
+      search.cacheTtlMinutes = 360;
+      console.log("[startup] set web search cache TTL to 360 minutes");
+      changed = true;
+    }
+    if (!search.maxResults || search.maxResults > 3) {
+      search.maxResults = 3;
+      console.log("[startup] set web search maxResults to 3");
+      changed = true;
+    }
+    // Auto-switch to Gemini search if GOOGLE_API_KEY is available (higher limits than Brave free)
+    if (process.env.GOOGLE_API_KEY && search.provider !== "gemini") {
+      search.provider = "gemini";
+      console.log("[startup] switched web search provider to gemini (GOOGLE_API_KEY detected)");
+      changed = true;
+    }
+
     if (changed) {
       writeFileSync(CONFIG, JSON.stringify(config, null, 2));
       console.log("[startup] config saved");
