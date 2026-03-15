@@ -221,6 +221,14 @@ RUN --mount=type=cache,id=s/e2b615b0-143b-471a-aa75-006f1a5e79a8-bookworm-apt-ca
         docker-ce-cli docker-compose-plugin; \
     fi
 
+# Optionally install Tailscale for encrypted mesh VPN access.
+# Build with: docker build --build-arg OPENCLAW_INSTALL_TAILSCALE=1 ...
+# Adds ~30MB. Requires TS_AUTHKEY env var at runtime.
+ARG OPENCLAW_INSTALL_TAILSCALE=""
+RUN if [ -n "$OPENCLAW_INSTALL_TAILSCALE" ]; then \
+      curl -fsSL https://tailscale.com/install.sh | sh; \
+    fi
+
 # Expose the CLI binary without requiring npm global writes as non-root.
 RUN ln -sf /app/openclaw.mjs /usr/local/bin/openclaw \
  && chmod 755 /app/openclaw.mjs

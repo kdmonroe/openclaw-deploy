@@ -60,10 +60,33 @@ if (existsSync(CONFIG)) {
       changed = true;
     }
 
-    // Disable Tailscale serve/funnel — incompatible with --bind lan needed for Railway
-    // Tailscale connectivity is now handled by Railway's networking or separate sidecar
-    if (config.gateway?.tailscale?.mode === "serve" || config.gateway?.tailscale?.mode === "funnel") {
-      console.log(`[startup] disabling tailscale mode=${config.gateway.tailscale.mode} (incompatible with --bind lan)`);
+    // Configure Tailscale if TS_AUTHKEY is set and tailscale binary is available
+    const tsAvailable = (() => {
+      try { execSync("which tailscale", { stdio: "ignore" }); return true; } catch { return false; }
+    })();
+    if (process.env.TS_AUTHKEY && tsAvailable) {
+      if (!config.gateway.tailscale) config.gateway.tailscale = {};
+      if (config.gateway.tailscale.mode !== "serve") {
+        config.gateway.tailscale.mode = "serve";
+        console.log("[startup] set tailscale.mode=serve");
+        changed = true;
+      }
+      if (!config.gateway.auth) config.gateway.auth = {};
+      if (!config.gateway.auth.allowTailscale) {
+        config.gateway.auth.allowTailscale = true;
+        console.log("[startup] set auth.allowTailscale=true");
+        changed = true;
+      }
+      // trustedProxies: tailscale serve proxies from loopback
+      if (!config.gateway.trustedProxies) config.gateway.trustedProxies = [];
+      if (!config.gateway.trustedProxies.includes("127.0.0.1")) {
+        config.gateway.trustedProxies.push("127.0.0.1");
+        console.log("[startup] added 127.0.0.1 to trustedProxies for tailscale serve");
+        changed = true;
+      }
+    } else if (config.gateway?.tailscale?.mode === "serve" || config.gateway?.tailscale?.mode === "funnel") {
+      // No Tailscale available — disable serve/funnel to avoid startup errors
+      console.log(`[startup] disabling tailscale mode=${config.gateway.tailscale.mode} (binary not available)`);
       delete config.gateway.tailscale.mode;
       changed = true;
     }
@@ -150,6 +173,58 @@ if (existsSync(AGENTS_DIR)) {
     } catch {}
   };
   cleanLocks(AGENTS_DIR);
+}
+
+// Step 1d: Start Tailscale daemon if available and TS_AUTHKEY is set
+import { mkdirSync } from "node:fs";
+const TS_STATE_DIR = "/data/.tailscale";
+if (process.env.TS_AUTHKEY) {
+  let tsInstalled = false;
+  try { execSync("which tailscale", { stdio: "ignore" }); tsInstalled = true; } catch {}
+
+  if (tsInstalled) {
+    mkdirSync(TS_STATE_DIR, { recursive: true });
+    mkdirSync("/var/run/tailscale", { recursive: true });
+    console.log("[startup] starting tailscaled...");
+    // Start tailscaled in background with userspace networking (no TUN device in Railway)
+    const tsd = spawn("tailscaled", [
+      "--tun=userspace-networking",
+      "--statedir", TS_STATE_DIR,
+      "--socket", "/var/run/tailscale/tailscaled.sock",
+    ], { stdio: "inherit", detached: true });
+    tsd.unref();
+
+    // Wait for tailscaled socket
+    for (let i = 0; i < 10; i++) {
+      try {
+        execSync("tailscale status 2>/dev/null", { stdio: "ignore", timeout: 2000 });
+        break;
+      } catch { await new Promise((r) => setTimeout(r, 1000)); }
+    }
+
+    // Authenticate
+    const hostname = process.env.TS_HOSTNAME || "openclaw";
+    try {
+      console.log(`[startup] tailscale up --hostname=${hostname}...`);
+      execSync(
+        `tailscale up --authkey="${process.env.TS_AUTHKEY}" --hostname="${hostname}" --accept-routes`,
+        { stdio: "inherit", timeout: 30000 }
+      );
+      const ip = execSync("tailscale ip -4 2>/dev/null", { encoding: "utf8" }).trim();
+      console.log(`[startup] tailscale connected: ${ip} (${hostname})`);
+
+      // Set up tailscale serve to proxy HTTPS to the gateway
+      execSync(`tailscale serve --bg --yes https+insecure://127.0.0.1:${PORT}`, {
+        stdio: "inherit",
+        timeout: 10000,
+      });
+      console.log(`[startup] tailscale serve active → https://${hostname}.tail987e19.ts.net/`);
+    } catch (e) {
+      console.error("[startup] tailscale setup failed:", e.message, "(continuing without tailscale)");
+    }
+  } else {
+    console.log("[startup] TS_AUTHKEY set but tailscale not installed (build with OPENCLAW_INSTALL_TAILSCALE=1)");
+  }
 }
 
 // Step 2: Run doctor --fix
