@@ -9,6 +9,6 @@
     "healthcheckTimeout": 300,
     "restartPolicyType": "ON_FAILURE",
     "restartPolicyMaxRetries": 10,
-    "startCommand": "node -e \"const f='/data/.openclaw/openclaw.json';try{const c=JSON.parse(require('fs').readFileSync(f,'utf8'));if(c.plugins?.installed){c.plugins.installed=c.plugins.installed.filter(p=>p.entry!=='.');require('fs').writeFileSync(f,JSON.stringify(c,null,2))}if(!c.gateway)c.gateway={};c.gateway.mode='local';require('fs').writeFileSync(f,JSON.stringify(c,null,2));console.log('[startup] config patched')}catch(e){console.log('[startup] config patch skipped:',e.message)}\"; node /app/openclaw.mjs doctor --fix 2>/dev/null; node /app/openclaw.mjs gateway --allow-unconfigured --bind lan --port ${PORT:-8080}"
+    "startCommand": "node /app/scripts/railway-startup.mjs"
   }
 }
