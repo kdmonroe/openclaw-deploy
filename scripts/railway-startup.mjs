@@ -65,10 +65,12 @@ if (existsSync(CONFIG)) {
       try { execSync("which tailscale", { stdio: "ignore" }); return true; } catch { return false; }
     })();
     if (process.env.TS_AUTHKEY && tsAvailable) {
-      if (!config.gateway.tailscale) config.gateway.tailscale = {};
-      if (config.gateway.tailscale.mode !== "serve") {
-        config.gateway.tailscale.mode = "serve";
-        console.log("[startup] set tailscale.mode=serve");
+      // Don't set tailscale.mode — gateway enforces bind=loopback for serve mode,
+      // which breaks Railway health checks. Instead, run tailscale serve independently
+      // in the startup script and let the gateway stay on --bind lan.
+      if (config.gateway?.tailscale?.mode) {
+        console.log(`[startup] clearing tailscale.mode=${config.gateway.tailscale.mode} (managed externally)`);
+        delete config.gateway.tailscale.mode;
         changed = true;
       }
       if (!config.gateway.auth) config.gateway.auth = {};
