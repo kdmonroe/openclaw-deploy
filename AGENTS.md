@@ -8,6 +8,13 @@ OpenClaw — a gateway-centric personal AI assistant platform. TypeScript (ESM),
 
 This is a **deployment fork** of [openclaw/openclaw](https://github.com/openclaw/openclaw) (v2026.3.12) with custom skills, coaching agents, and Railway deployment configuration.
 
+### Key customizations
+- **Lossless Claw** context engine (`@martian-engineering/lossless-claw`) — DAG-based lossless memory management
+- **Tailscale sidecar** — encrypted mesh VPN access to the gateway
+- **Custom startup script** (`scripts/railway-startup.mjs`) — config migration, search throttling, lock cleanup
+- **6 coaching agents** — Star Wars droid personas with heartbeat schedules
+- **55 custom skills** — domain-specific intelligence for the assistant
+
 ## Quick reference
 
 ```bash
@@ -71,6 +78,7 @@ The Railway deployment has a Tailscale sidecar enabled via `TS_AUTHKEY` env var.
 - `trustedProxies` must include `127.0.0.1` when using `tailscale serve` (serve proxies from loopback, forwarding client IP via headers)
 - Device pairing: Tailscale-authenticated connections auto-approve pairing. Token-only connections from new devices still require manual `devices approve`.
 - Chrome on macOS cannot resolve `.ts.net` domains (Chrome's async DNS bypasses Tailscale MagicDNS); use Safari, or set Chrome > Settings > Security > "Use secure DNS" to "With your current service provider"
+- Lossless Claw plugin (`@martian-engineering/lossless-claw`) installed on the gateway — startup script preserves its `plugins.slots.contextEngine` registration across redeploys
 
 **GitHub auth on Railway:**
 
