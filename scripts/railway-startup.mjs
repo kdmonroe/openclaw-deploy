@@ -71,6 +71,16 @@ if (existsSync(CONFIG)) {
   }
 }
 
+// Step 1b: Remove stale extension directories from volume
+import { rmSync } from "node:fs";
+const staleExtDirs = ["/data/.openclaw/extensions/openclaw-telegram-file-browser"];
+for (const dir of staleExtDirs) {
+  if (existsSync(dir)) {
+    rmSync(dir, { recursive: true, force: true });
+    console.log(`[startup] removed stale extension: ${dir}`);
+  }
+}
+
 // Step 2: Run doctor --fix
 try {
   console.log("[startup] running doctor --fix...");
