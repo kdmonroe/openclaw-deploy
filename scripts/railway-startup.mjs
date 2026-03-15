@@ -68,10 +68,25 @@ if (existsSync(CONFIG)) {
       changed = true;
     }
 
-    // Remove stale model aliases that cause ANTHROPIC_MODEL_ALIASES reference error
-    if (config.models?.aliases) {
-      console.log("[startup] clearing stale model aliases");
-      delete config.models.aliases;
+    // Clear entire models config — stale model refs from v2026.2.x trigger
+    // ANTHROPIC_MODEL_ALIASES circular reference in v2026.3.12 config loader
+    if (config.models) {
+      console.log("[startup] clearing stale models config:", Object.keys(config.models));
+      delete config.models;
+      changed = true;
+    }
+
+    // Ensure Control UI allows Railway and Tailscale origins (required for --bind lan)
+    if (!config.gateway.controlUi) config.gateway.controlUi = {};
+    const requiredOrigins = [
+      `https://openclaw-production-8709.up.railway.app`,
+      `https://openclaw.tail987e19.ts.net`,
+    ];
+    const current = config.gateway.controlUi.allowedOrigins || [];
+    const missing = requiredOrigins.filter((o) => !current.includes(o));
+    if (missing.length > 0) {
+      config.gateway.controlUi.allowedOrigins = [...new Set([...current, ...requiredOrigins])];
+      console.log("[startup] set controlUi.allowedOrigins:", config.gateway.controlUi.allowedOrigins);
       changed = true;
     }
 
