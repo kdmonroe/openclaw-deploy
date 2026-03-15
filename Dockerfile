@@ -226,14 +226,9 @@ RUN ln -sf /app/openclaw.mjs /usr/local/bin/openclaw \
 
 ENV NODE_ENV=production
 
-# Railway startup script: fixes volume permissions from old root-owned
-# deployments, then drops to the node user and starts the gateway.
-COPY railway-start.sh /app/railway-start.sh
-RUN chmod +x /app/railway-start.sh
-
-# Built-in probe endpoints for container health checks:
-#   - GET /healthz (liveness) and GET /readyz (readiness)
-#   - aliases: /health and /ready
+# Start gateway server with default config.
+# Railway: startCommand in railway.json overrides CMD.
+# Docker: binds to loopback by default; override with --bind lan for network access.
 HEALTHCHECK --interval=3m --timeout=10s --start-period=30s --retries=3 \
-  CMD node -e "fetch('http://127.0.0.1:${PORT:-18789}/healthz').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
-CMD ["/app/railway-start.sh"]
+  CMD node -e "fetch('http://127.0.0.1:' + (process.env.PORT || '18789') + '/healthz').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+CMD ["node", "openclaw.mjs", "gateway", "--allow-unconfigured"]
