@@ -9,6 +9,6 @@
     "healthcheckTimeout": 300,
     "restartPolicyType": "ON_FAILURE",
     "restartPolicyMaxRetries": 10,
-    "startCommand": "node /app/openclaw.mjs doctor --fix 2>/dev/null; node /app/openclaw.mjs gateway --allow-unconfigured --bind lan --port ${PORT:-8080}"
+    "startCommand": "node /app/openclaw.mjs config set gateway.mode local 2>/dev/null; node /app/openclaw.mjs doctor --fix 2>/dev/null; node /app/openclaw.mjs gateway --allow-unconfigured --bind lan --port ${PORT:-8080}"
   }
 }
