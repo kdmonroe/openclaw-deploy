@@ -44,17 +44,11 @@ if (existsSync(CONFIG)) {
       }
     }
 
-    // Remove openclaw-telegram-file-browser (not installed in new image)
-    if (config.plugins?.entries?.["openclaw-telegram-file-browser"]) {
-      delete config.plugins.entries["openclaw-telegram-file-browser"];
-      console.log("[startup] removed stale openclaw-telegram-file-browser plugin entry");
-      changed = true;
-    }
-
-    // Nuclear option: if plugins still has problematic structure, clear it
-    if (config.plugins?.enabled === false) {
+    // Clear all plugins config — old entries are incompatible with v2026.3.12
+    // Extensions auto-discover from the extensions/ directory
+    if (config.plugins) {
+      console.log("[startup] clearing old plugins config (auto-discovery will handle extensions)");
       delete config.plugins;
-      console.log("[startup] removed plugins.enabled=false (blocks all plugins)");
       changed = true;
     }
 
