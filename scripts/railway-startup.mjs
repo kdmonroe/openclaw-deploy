@@ -6,6 +6,35 @@ import { execSync, spawn } from "node:child_process";
 const CONFIG = "/data/.openclaw/openclaw.json";
 const PORT = process.env.PORT || "8080";
 
+// Step 0: Fix git safe.directory (volume owned by node, shell runs as root)
+try {
+  execSync("git config --global --add safe.directory '*'", { stdio: "ignore" });
+} catch {}
+
+// Step 0b: Install gh CLI if missing and GH_TOKEN is set
+if (process.env.GH_TOKEN) {
+  try {
+    execSync("which gh", { stdio: "ignore" });
+  } catch {
+    console.log("[startup] installing gh CLI...");
+    try {
+      execSync(
+        "curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg 2>/dev/null && " +
+        'echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" > /etc/apt/sources.list.d/github-cli.list && ' +
+        "apt-get update -qq && apt-get install -y -qq gh >/dev/null 2>&1",
+        { stdio: "inherit", timeout: 60000 }
+      );
+      // Configure gh auth
+      execSync(`echo "${process.env.GH_TOKEN}" | gh auth login --with-token`, { stdio: "ignore" });
+      // Configure git credential helper
+      execSync("gh auth setup-git", { stdio: "ignore" });
+      console.log("[startup] gh CLI installed and authenticated");
+    } catch (e) {
+      console.log("[startup] gh CLI install failed:", e.message, "(continuing)");
+    }
+  }
+}
+
 // Step 1: Patch config
 if (existsSync(CONFIG)) {
   try {
