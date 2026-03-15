@@ -24,8 +24,11 @@ if (process.env.GH_TOKEN) {
         "apt-get update -qq && apt-get install -y -qq gh >/dev/null 2>&1",
         { stdio: "inherit", timeout: 60000 }
       );
-      // Configure gh auth
-      execSync(`echo "${process.env.GH_TOKEN}" | gh auth login --with-token`, { stdio: "ignore" });
+      // Configure gh auth (pipe token via env to avoid shell escaping issues)
+      execSync("gh auth login --with-token", {
+        input: process.env.GH_TOKEN,
+        stdio: ["pipe", "ignore", "ignore"],
+      });
       // Configure git credential helper
       execSync("gh auth setup-git", { stdio: "ignore" });
       console.log("[startup] gh CLI installed and authenticated");
