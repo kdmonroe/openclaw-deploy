@@ -60,6 +60,21 @@ if (existsSync(CONFIG)) {
       changed = true;
     }
 
+    // Disable Tailscale serve/funnel — incompatible with --bind lan needed for Railway
+    // Tailscale connectivity is now handled by Railway's networking or separate sidecar
+    if (config.gateway?.tailscale?.mode === "serve" || config.gateway?.tailscale?.mode === "funnel") {
+      console.log(`[startup] disabling tailscale mode=${config.gateway.tailscale.mode} (incompatible with --bind lan)`);
+      delete config.gateway.tailscale.mode;
+      changed = true;
+    }
+
+    // Remove stale model aliases that cause ANTHROPIC_MODEL_ALIASES reference error
+    if (config.models?.aliases) {
+      console.log("[startup] clearing stale model aliases");
+      delete config.models.aliases;
+      changed = true;
+    }
+
     if (changed) {
       writeFileSync(CONFIG, JSON.stringify(config, null, 2));
       console.log("[startup] config saved");
