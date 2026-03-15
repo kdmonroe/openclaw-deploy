@@ -1,3 +1,11 @@
+> **Fork: `kdmonroe/openclaw-deploy`** (branch: `deploy`)
+>
+> Deployment fork of OpenClaw v2026.3.12 with Railway + Tailscale infrastructure,
+> Lossless Claw context engine, 6 coaching agents, and 55 custom skills.
+> See [`CLAUDE.md`](CLAUDE.md) for full deployment documentation.
+
+---
+
 # 🦞 OpenClaw — Personal AI Assistant
 
 <p align="center">

@@ -58,6 +58,18 @@ if (existsSync(CONFIG)) {
       changed = true;
     }
 
+    // Ensure LCM database uses persistent volume path
+    if (config.plugins?.config?.["lossless-claw"] !== undefined || config.plugins?.slots?.contextEngine === "lossless-claw") {
+      if (!config.plugins) config.plugins = {};
+      if (!config.plugins.config) config.plugins.config = {};
+      if (!config.plugins.config["lossless-claw"]) config.plugins.config["lossless-claw"] = {};
+      if (config.plugins.config["lossless-claw"].dbPath !== "/data/.openclaw/lcm.db") {
+        config.plugins.config["lossless-claw"].dbPath = "/data/.openclaw/lcm.db";
+        console.log("[startup] set LCM dbPath to /data/.openclaw/lcm.db (persistent volume)");
+        changed = true;
+      }
+    }
+
     // Set gateway.mode if missing
     if (!config.gateway) config.gateway = {};
     if (!config.gateway.mode) {
@@ -155,8 +167,42 @@ if (existsSync(CONFIG)) {
   }
 }
 
-// Step 1b: Remove stale extension directories from volume
-import { rmSync } from "node:fs";
+// Step 1b: Symlink workspace and state dirs so gateway finds persistent data
+import { rmSync, symlinkSync, lstatSync } from "node:fs";
+const HOME_OPENCLAW = "/root/.openclaw";
+const WORKSPACE_LINK = `${HOME_OPENCLAW}/workspace`;
+const WORKSPACE_TARGET = "/data/workspace";
+// Symlink ~/.openclaw/workspace → /data/workspace (persistent volume)
+if (existsSync(WORKSPACE_TARGET)) {
+  if (existsSync(WORKSPACE_LINK)) {
+    try {
+      const stat = lstatSync(WORKSPACE_LINK);
+      if (!stat.isSymbolicLink()) {
+        rmSync(WORKSPACE_LINK, { recursive: true, force: true });
+        symlinkSync(WORKSPACE_TARGET, WORKSPACE_LINK);
+        console.log(`[startup] replaced ${WORKSPACE_LINK} with symlink → ${WORKSPACE_TARGET}`);
+      }
+    } catch {}
+  } else {
+    mkdirSync(HOME_OPENCLAW, { recursive: true });
+    symlinkSync(WORKSPACE_TARGET, WORKSPACE_LINK);
+    console.log(`[startup] created symlink ${WORKSPACE_LINK} → ${WORKSPACE_TARGET}`);
+  }
+}
+// Move LCM database to persistent volume if it landed in the ephemeral home dir
+const LCM_DB_EPHEMERAL = `${HOME_OPENCLAW}/lcm.db`;
+const LCM_DB_PERSISTENT = "/data/.openclaw/lcm.db";
+import { renameSync, copyFileSync } from "node:fs";
+if (existsSync(LCM_DB_EPHEMERAL) && !existsSync(LCM_DB_PERSISTENT)) {
+  try {
+    copyFileSync(LCM_DB_EPHEMERAL, LCM_DB_PERSISTENT);
+    console.log(`[startup] copied LCM database to persistent volume: ${LCM_DB_PERSISTENT}`);
+  } catch (e) {
+    console.log(`[startup] LCM db copy failed: ${e.message}`);
+  }
+}
+
+// Step 1c: Remove stale extension directories from volume
 const staleExtDirs = ["/data/.openclaw/extensions/openclaw-telegram-file-browser"];
 for (const dir of staleExtDirs) {
   if (existsSync(dir)) {
