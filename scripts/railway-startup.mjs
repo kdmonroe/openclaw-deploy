@@ -44,11 +44,17 @@ if (existsSync(CONFIG)) {
       }
     }
 
-    // Clear all plugins config — old entries are incompatible with v2026.3.12
-    // Extensions auto-discover from the extensions/ directory
+    // Clear stale plugins config EXCEPT lossless-claw context engine slot
     if (config.plugins) {
-      console.log("[startup] clearing old plugins config (auto-discovery will handle extensions)");
+      const lcmSlot = config.plugins?.slots?.contextEngine;
+      const lcmConfig = config.plugins?.config?.["lossless-claw"];
+      console.log("[startup] clearing old plugins config (preserving context engine slot)");
       delete config.plugins;
+      if (lcmSlot === "lossless-claw") {
+        config.plugins = { slots: { contextEngine: "lossless-claw" } };
+        if (lcmConfig) config.plugins.config = { "lossless-claw": lcmConfig };
+        console.log("[startup] preserved lossless-claw context engine slot");
+      }
       changed = true;
     }
 
