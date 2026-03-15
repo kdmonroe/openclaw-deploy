@@ -12,16 +12,43 @@ if (existsSync(CONFIG)) {
     const config = JSON.parse(readFileSync(CONFIG, "utf8"));
     let changed = false;
 
-    // Remove plugins with entry='.' (incompatible with v2026.3.12)
+    // Log current plugin state for debugging
+    if (config.plugins) {
+      console.log("[startup] plugins keys:", Object.keys(config.plugins));
+      if (config.plugins.installed)
+        console.log("[startup] plugins.installed:", JSON.stringify(config.plugins.installed));
+      if (config.plugins.entries)
+        console.log("[startup] plugins.entries keys:", Object.keys(config.plugins.entries));
+    }
+
+    // Remove plugins with entry='.' from installed array (incompatible with v2026.3.12)
     if (config.plugins?.installed) {
       const before = config.plugins.installed.length;
       config.plugins.installed = config.plugins.installed.filter(
-        (p) => p.entry !== "."
+        (p) => p.entry !== "." && p.entry !== "./"
       );
       if (config.plugins.installed.length < before) {
-        console.log("[startup] removed bad plugin entries");
+        console.log("[startup] removed bad plugin.installed entries");
         changed = true;
       }
+    }
+
+    // Remove plugins.entries with entry='.' (object form)
+    if (config.plugins?.entries) {
+      for (const [name, val] of Object.entries(config.plugins.entries)) {
+        if (val?.entry === "." || val?.entry === "./" || val === ".") {
+          delete config.plugins.entries[name];
+          console.log(`[startup] removed bad plugins.entries.${name}`);
+          changed = true;
+        }
+      }
+    }
+
+    // Nuclear option: if plugins still has problematic structure, clear it
+    if (config.plugins?.enabled === false) {
+      delete config.plugins;
+      console.log("[startup] removed plugins.enabled=false (blocks all plugins)");
+      changed = true;
     }
 
     // Set gateway.mode if missing
