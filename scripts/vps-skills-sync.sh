@@ -6,7 +6,7 @@
 set -euo pipefail
 
 SKILLS_DIR="${OPENCLAW_SKILLS_DIR:-$HOME/.openclaw/skills}"
-REPO_URL="${OPENCLAW_REPO_URL:-https://github.com/kdmonroe/openclaw-deploy-2.git}"
+REPO_URL="${OPENCLAW_REPO_URL:-https://github.com/kdmonroe/openclaw-deploy.git}"
 LOG_FILE="${OPENCLAW_SYNC_LOG:-$HOME/.openclaw/logs/skills-sync.log}"
 BRANCH="${OPENCLAW_SYNC_BRANCH:-main}"
 

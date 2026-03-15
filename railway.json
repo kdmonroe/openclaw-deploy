@@ -7,7 +7,7 @@
   "deploy": {
     "healthcheckPath": "/healthz",
     "healthcheckTimeout": 300,
-    "restartPolicyType": "ON_FAILURE",
+    "restartPolicyType": "ALWAYS",
     "restartPolicyMaxRetries": 10,
     "startCommand": "node /app/scripts/railway-startup.mjs"
   }

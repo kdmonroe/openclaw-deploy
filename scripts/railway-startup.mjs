@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Railway startup: patch old config for v2026.3.12 compatibility, then start gateway
-import { readFileSync, writeFileSync, existsSync } from "node:fs";
+import { readFileSync, writeFileSync, existsSync, readdirSync, unlinkSync } from "node:fs";
 import { execSync, spawn } from "node:child_process";
 
 const CONFIG = "/data/.openclaw/openclaw.json";
@@ -94,6 +94,24 @@ for (const dir of staleExtDirs) {
     rmSync(dir, { recursive: true, force: true });
     console.log(`[startup] removed stale extension: ${dir}`);
   }
+}
+
+// Step 1c: Clean stale lock files from previous container runs
+const AGENTS_DIR = "/data/.openclaw/agents";
+if (existsSync(AGENTS_DIR)) {
+  const cleanLocks = (dir) => {
+    try {
+      for (const entry of readdirSync(dir, { withFileTypes: true })) {
+        const full = `${dir}/${entry.name}`;
+        if (entry.isDirectory()) cleanLocks(full);
+        else if (entry.name.endsWith(".lock")) {
+          unlinkSync(full);
+          console.log(`[startup] removed stale lock: ${full}`);
+        }
+      }
+    } catch {}
+  };
+  cleanLocks(AGENTS_DIR);
 }
 
 // Step 2: Run doctor --fix
