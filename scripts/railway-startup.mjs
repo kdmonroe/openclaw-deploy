@@ -44,6 +44,13 @@ if (existsSync(CONFIG)) {
       }
     }
 
+    // Remove openclaw-telegram-file-browser (not installed in new image)
+    if (config.plugins?.entries?.["openclaw-telegram-file-browser"]) {
+      delete config.plugins.entries["openclaw-telegram-file-browser"];
+      console.log("[startup] removed stale openclaw-telegram-file-browser plugin entry");
+      changed = true;
+    }
+
     // Nuclear option: if plugins still has problematic structure, clear it
     if (config.plugins?.enabled === false) {
       delete config.plugins;
