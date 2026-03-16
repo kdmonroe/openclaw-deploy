@@ -11,6 +11,23 @@ try {
   execSync("git config --global --add safe.directory '*'", { stdio: "ignore" });
 } catch {}
 
+// Step 0a: Install gog CLI (Google Workspace) if missing
+try {
+  execSync("which gog", { stdio: "ignore" });
+} catch {
+  console.log("[startup] installing gog CLI...");
+  try {
+    const arch = execSync("dpkg --print-architecture", { encoding: "utf8" }).trim();
+    execSync(
+      `curl -fsSL https://github.com/steipete/gogcli/releases/download/v0.12.0/gogcli_0.12.0_linux_${arch}.tar.gz | tar xz -C /usr/local/bin gog`,
+      { stdio: "inherit", timeout: 30000 }
+    );
+    console.log("[startup] gog CLI installed");
+  } catch (e) {
+    console.log("[startup] gog install failed:", e.message, "(continuing)");
+  }
+}
+
 // Step 0b: Install gh CLI if missing and GH_TOKEN is set
 if (process.env.GH_TOKEN) {
   try {
