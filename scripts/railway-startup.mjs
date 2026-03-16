@@ -11,7 +11,26 @@ try {
   execSync("git config --global --add safe.directory '*'", { stdio: "ignore" });
 } catch {}
 
-// Step 0a: Install gog CLI (Google Workspace) if missing
+// Step 0a: Symlink gog config from persistent volume
+const GOG_CONFIG_VOL = "/data/.openclaw/gogcli-config";
+const GOG_CONFIG_HOME = "/root/.config/gogcli";
+if (existsSync(GOG_CONFIG_VOL)) {
+  try {
+    const stat = lstatSync(GOG_CONFIG_HOME);
+    if (!stat.isSymbolicLink()) {
+      rmSync(GOG_CONFIG_HOME, { recursive: true, force: true });
+      mkdirSync("/root/.config", { recursive: true });
+      symlinkSync(GOG_CONFIG_VOL, GOG_CONFIG_HOME);
+      console.log(`[startup] symlinked gog config → ${GOG_CONFIG_VOL}`);
+    }
+  } catch {
+    mkdirSync("/root/.config", { recursive: true });
+    symlinkSync(GOG_CONFIG_VOL, GOG_CONFIG_HOME);
+    console.log(`[startup] symlinked gog config → ${GOG_CONFIG_VOL}`);
+  }
+}
+
+// Step 0b: Install gog CLI (Google Workspace) if missing
 try {
   execSync("which gog", { stdio: "ignore" });
 } catch {
