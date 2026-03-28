@@ -132,6 +132,7 @@ WORKDIR /app
 RUN --mount=type=cache,id=s/e2b615b0-143b-471a-aa75-006f1a5e79a8-bookworm-apt-cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,id=s/e2b615b0-143b-471a-aa75-006f1a5e79a8-bookworm-apt-lists,target=/var/lib/apt,sharing=locked \
     apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get upgrade -y --no-install-recommends && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
       procps hostname curl git openssl
 
