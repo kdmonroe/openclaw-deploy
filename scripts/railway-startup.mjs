@@ -236,6 +236,33 @@ if (existsSync(CONFIG)) {
       }
     }
 
+    // Clear per-agent model overrides — all agents use the global default (minimax/MiniMax-M2.7)
+    if (Array.isArray(config.agents?.list)) {
+      for (const agent of config.agents.list) {
+        if (agent.model) {
+          console.log(
+            `[startup] cleared model override for agent "${agent.id}": ${JSON.stringify(agent.model)}`,
+          );
+          delete agent.model;
+        }
+      }
+      changed = true;
+    }
+
+    // Clear channel-specific model overrides
+    if (config.channels?.modelByChannel) {
+      console.log("[startup] cleared channel model overrides");
+      delete config.channels.modelByChannel;
+      changed = true;
+    }
+
+    // Standardize response prefix for consistent Telegram headers
+    if (!config.messages) {
+      config.messages = {};
+    }
+    config.messages.responsePrefix = "[{identity.name}] [{model}]";
+    changed = true;
+
     // Ensure Control UI allows Railway and Tailscale origins (required for --bind lan)
     if (!config.gateway.controlUi) {
       config.gateway.controlUi = {};
