@@ -218,21 +218,23 @@ if (existsSync(CONFIG)) {
       changed = true;
     }
 
-    // Set MiniMax M2.7 as default model for all interactions
-    if (!config.agents) {
-      config.agents = {};
+    // Clear agents.defaults model refs — model refs in config trigger the
+    // ANTHROPIC_MODEL_ALIASES circular reference bug during config loading.
+    // The source code defaults (DEFAULT_PROVIDER=minimax, DEFAULT_MODEL=MiniMax-M2.7)
+    // handle the fallback when config has no model set.
+    if (config.agents?.defaults) {
+      const cleared = [];
+      for (const key of ["model", "imageModel", "pdfModel"]) {
+        if (config.agents.defaults[key]) {
+          delete config.agents.defaults[key];
+          cleared.push(key);
+        }
+      }
+      if (cleared.length) {
+        console.log("[startup] cleared stale model refs from agents.defaults:", cleared.join(", "));
+        changed = true;
+      }
     }
-    if (!config.agents.defaults) {
-      config.agents.defaults = {};
-    }
-    config.agents.defaults.model = {
-      primary: "minimax/MiniMax-M2.7",
-      fallbacks: ["minimax/MiniMax-M2.5"],
-    };
-    config.agents.defaults.imageModel = "minimax/MiniMax-VL-01";
-    config.agents.defaults.pdfModel = "minimax/MiniMax-VL-01";
-    console.log("[startup] set default model: minimax/MiniMax-M2.7");
-    changed = true;
 
     // Ensure Control UI allows Railway and Tailscale origins (required for --bind lan)
     if (!config.gateway.controlUi) {
