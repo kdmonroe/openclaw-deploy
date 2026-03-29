@@ -426,12 +426,11 @@ if (process.env.TS_AUTHKEY) {
       const ip = execSync("tailscale ip -4 2>/dev/null", { encoding: "utf8" }).trim();
       console.log(`[startup] tailscale connected: ${ip} (${hostname})`);
 
-      // Set up tailscale serve to proxy HTTPS to the gateway
-      execSync(`tailscale serve --bg --yes https+insecure://127.0.0.1:${PORT}`, {
-        stdio: "inherit",
-        timeout: 10000,
-      });
-      console.log(`[startup] tailscale serve active → https://${hostname}.tail987e19.ts.net/`);
+      // Defer tailscale serve until after the gateway starts — upstream v2026.3.12+
+      // detects active tailscale serve and refuses --bind lan (requires loopback).
+      // We need --bind lan for Railway health checks, so start serve after gateway.
+      globalThis.__tsServeCmd = `tailscale serve --bg --yes https+insecure://127.0.0.1:${PORT}`;
+      globalThis.__tsHostname = hostname;
     } catch (e) {
       console.error(
         "[startup] tailscale setup failed:",
@@ -466,5 +465,19 @@ const child = spawn(
   { stdio: "inherit" },
 );
 child.on("exit", (code) => process.exit(code ?? 1));
+
+// Deferred: start tailscale serve after the gateway is listening
+if (globalThis.__tsServeCmd) {
+  setTimeout(() => {
+    try {
+      execSync(globalThis.__tsServeCmd, { stdio: "inherit", timeout: 10000 });
+      console.log(
+        `[startup] tailscale serve active → https://${globalThis.__tsHostname}.tail987e19.ts.net/`,
+      );
+    } catch (e) {
+      console.error("[startup] tailscale serve failed:", e.message);
+    }
+  }, 15000); // 15s delay for gateway to start listening
+}
 process.on("SIGTERM", () => child.kill("SIGTERM"));
 process.on("SIGINT", () => child.kill("SIGINT"));
