@@ -1,7 +1,7 @@
 #!/usr/bin/env node
+import { execSync, spawn } from "node:child_process";
 // Railway startup: patch old config for v2026.3.12 compatibility, then start gateway
 import { readFileSync, writeFileSync, existsSync, readdirSync, unlinkSync } from "node:fs";
-import { execSync, spawn } from "node:child_process";
 
 const CONFIG = "/data/.openclaw/openclaw.json";
 const PORT = process.env.PORT || "8080";
@@ -39,7 +39,7 @@ try {
     const arch = execSync("dpkg --print-architecture", { encoding: "utf8" }).trim();
     execSync(
       `curl -fsSL https://github.com/steipete/gogcli/releases/download/v0.12.0/gogcli_0.12.0_linux_${arch}.tar.gz | tar xz -C /usr/local/bin gog`,
-      { stdio: "inherit", timeout: 30000 }
+      { stdio: "inherit", timeout: 30000 },
     );
     console.log("[startup] gog CLI installed");
   } catch (e) {
@@ -56,9 +56,9 @@ if (process.env.GH_TOKEN) {
     try {
       execSync(
         "curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg 2>/dev/null && " +
-        'echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" > /etc/apt/sources.list.d/github-cli.list && ' +
-        "apt-get update -qq && apt-get install -y -qq gh >/dev/null 2>&1",
-        { stdio: "inherit", timeout: 60000 }
+          'echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" > /etc/apt/sources.list.d/github-cli.list && ' +
+          "apt-get update -qq && apt-get install -y -qq gh >/dev/null 2>&1",
+        { stdio: "inherit", timeout: 60000 },
       );
       // Configure gh auth (pipe token via env to avoid shell escaping issues)
       execSync("gh auth login --with-token", {
@@ -83,17 +83,19 @@ if (existsSync(CONFIG)) {
     // Log current plugin state for debugging
     if (config.plugins) {
       console.log("[startup] plugins keys:", Object.keys(config.plugins));
-      if (config.plugins.installed)
+      if (config.plugins.installed) {
         console.log("[startup] plugins.installed:", JSON.stringify(config.plugins.installed));
-      if (config.plugins.entries)
+      }
+      if (config.plugins.entries) {
         console.log("[startup] plugins.entries keys:", Object.keys(config.plugins.entries));
+      }
     }
 
     // Remove plugins with entry='.' from installed array (incompatible with v2026.3.12)
     if (config.plugins?.installed) {
       const before = config.plugins.installed.length;
       config.plugins.installed = config.plugins.installed.filter(
-        (p) => p.entry !== "." && p.entry !== "./"
+        (p) => p.entry !== "." && p.entry !== "./",
       );
       if (config.plugins.installed.length < before) {
         console.log("[startup] removed bad plugin.installed entries");
@@ -120,17 +122,28 @@ if (existsSync(CONFIG)) {
       delete config.plugins;
       if (lcmSlot === "lossless-claw") {
         config.plugins = { slots: { contextEngine: "lossless-claw" } };
-        if (lcmConfig) config.plugins.config = { "lossless-claw": lcmConfig };
+        if (lcmConfig) {
+          config.plugins.config = { "lossless-claw": lcmConfig };
+        }
         console.log("[startup] preserved lossless-claw context engine slot");
       }
       changed = true;
     }
 
     // Ensure LCM database uses persistent volume path
-    if (config.plugins?.config?.["lossless-claw"] !== undefined || config.plugins?.slots?.contextEngine === "lossless-claw") {
-      if (!config.plugins) config.plugins = {};
-      if (!config.plugins.config) config.plugins.config = {};
-      if (!config.plugins.config["lossless-claw"]) config.plugins.config["lossless-claw"] = {};
+    if (
+      config.plugins?.config?.["lossless-claw"] !== undefined ||
+      config.plugins?.slots?.contextEngine === "lossless-claw"
+    ) {
+      if (!config.plugins) {
+        config.plugins = {};
+      }
+      if (!config.plugins.config) {
+        config.plugins.config = {};
+      }
+      if (!config.plugins.config["lossless-claw"]) {
+        config.plugins.config["lossless-claw"] = {};
+      }
       if (config.plugins.config["lossless-claw"].dbPath !== "/data/.openclaw/lcm.db") {
         config.plugins.config["lossless-claw"].dbPath = "/data/.openclaw/lcm.db";
         console.log("[startup] set LCM dbPath to /data/.openclaw/lcm.db (persistent volume)");
@@ -139,7 +152,9 @@ if (existsSync(CONFIG)) {
     }
 
     // Set gateway.mode if missing
-    if (!config.gateway) config.gateway = {};
+    if (!config.gateway) {
+      config.gateway = {};
+    }
     if (!config.gateway.mode) {
       config.gateway.mode = "local";
       console.log("[startup] set gateway.mode=local");
@@ -148,33 +163,49 @@ if (existsSync(CONFIG)) {
 
     // Configure Tailscale if TS_AUTHKEY is set and tailscale binary is available
     const tsAvailable = (() => {
-      try { execSync("which tailscale", { stdio: "ignore" }); return true; } catch { return false; }
+      try {
+        execSync("which tailscale", { stdio: "ignore" });
+        return true;
+      } catch {
+        return false;
+      }
     })();
     if (process.env.TS_AUTHKEY && tsAvailable) {
       // Don't set tailscale.mode — gateway enforces bind=loopback for serve mode,
       // which breaks Railway health checks. Instead, run tailscale serve independently
       // in the startup script and let the gateway stay on --bind lan.
       if (config.gateway?.tailscale?.mode) {
-        console.log(`[startup] clearing tailscale.mode=${config.gateway.tailscale.mode} (managed externally)`);
+        console.log(
+          `[startup] clearing tailscale.mode=${config.gateway.tailscale.mode} (managed externally)`,
+        );
         delete config.gateway.tailscale.mode;
         changed = true;
       }
-      if (!config.gateway.auth) config.gateway.auth = {};
+      if (!config.gateway.auth) {
+        config.gateway.auth = {};
+      }
       if (!config.gateway.auth.allowTailscale) {
         config.gateway.auth.allowTailscale = true;
         console.log("[startup] set auth.allowTailscale=true");
         changed = true;
       }
       // trustedProxies: tailscale serve proxies from loopback
-      if (!config.gateway.trustedProxies) config.gateway.trustedProxies = [];
+      if (!config.gateway.trustedProxies) {
+        config.gateway.trustedProxies = [];
+      }
       if (!config.gateway.trustedProxies.includes("127.0.0.1")) {
         config.gateway.trustedProxies.push("127.0.0.1");
         console.log("[startup] added 127.0.0.1 to trustedProxies for tailscale serve");
         changed = true;
       }
-    } else if (config.gateway?.tailscale?.mode === "serve" || config.gateway?.tailscale?.mode === "funnel") {
+    } else if (
+      config.gateway?.tailscale?.mode === "serve" ||
+      config.gateway?.tailscale?.mode === "funnel"
+    ) {
       // No Tailscale available — disable serve/funnel to avoid startup errors
-      console.log(`[startup] disabling tailscale mode=${config.gateway.tailscale.mode} (binary not available)`);
+      console.log(
+        `[startup] disabling tailscale mode=${config.gateway.tailscale.mode} (binary not available)`,
+      );
       delete config.gateway.tailscale.mode;
       changed = true;
     }
@@ -187,8 +218,55 @@ if (existsSync(CONFIG)) {
       changed = true;
     }
 
+    // Clear agents.defaults model refs — model refs in config trigger the
+    // ANTHROPIC_MODEL_ALIASES circular reference bug during config loading.
+    // The source code defaults (DEFAULT_PROVIDER=minimax, DEFAULT_MODEL=MiniMax-M2.7)
+    // handle the fallback when config has no model set.
+    if (config.agents?.defaults) {
+      const cleared = [];
+      for (const key of ["model", "imageModel", "pdfModel"]) {
+        if (config.agents.defaults[key]) {
+          delete config.agents.defaults[key];
+          cleared.push(key);
+        }
+      }
+      if (cleared.length) {
+        console.log("[startup] cleared stale model refs from agents.defaults:", cleared.join(", "));
+        changed = true;
+      }
+    }
+
+    // Clear per-agent model overrides — all agents use the global default (minimax/MiniMax-M2.7)
+    if (Array.isArray(config.agents?.list)) {
+      for (const agent of config.agents.list) {
+        if (agent.model) {
+          console.log(
+            `[startup] cleared model override for agent "${agent.id}": ${JSON.stringify(agent.model)}`,
+          );
+          delete agent.model;
+        }
+      }
+      changed = true;
+    }
+
+    // Clear channel-specific model overrides
+    if (config.channels?.modelByChannel) {
+      console.log("[startup] cleared channel model overrides");
+      delete config.channels.modelByChannel;
+      changed = true;
+    }
+
+    // Standardize response prefix for consistent Telegram headers
+    if (!config.messages) {
+      config.messages = {};
+    }
+    config.messages.responsePrefix = "[{identity.name}] [{model}]";
+    changed = true;
+
     // Ensure Control UI allows Railway and Tailscale origins (required for --bind lan)
-    if (!config.gateway.controlUi) config.gateway.controlUi = {};
+    if (!config.gateway.controlUi) {
+      config.gateway.controlUi = {};
+    }
     const requiredOrigins = [
       `https://openclaw-production-8709.up.railway.app`,
       `https://openclaw.tail987e19.ts.net`,
@@ -197,15 +275,24 @@ if (existsSync(CONFIG)) {
     const missing = requiredOrigins.filter((o) => !current.includes(o));
     if (missing.length > 0) {
       config.gateway.controlUi.allowedOrigins = [...new Set([...current, ...requiredOrigins])];
-      console.log("[startup] set controlUi.allowedOrigins:", config.gateway.controlUi.allowedOrigins);
+      console.log(
+        "[startup] set controlUi.allowedOrigins:",
+        config.gateway.controlUi.allowedOrigins,
+      );
       changed = true;
     }
 
     // Throttle web search to stay within Brave free plan limits (1 req/sec, 2000/month)
     // Increase cache TTL to 6 hours and reduce max results per query
-    if (!config.tools) config.tools = {};
-    if (!config.tools.web) config.tools.web = {};
-    if (!config.tools.web.search) config.tools.web.search = {};
+    if (!config.tools) {
+      config.tools = {};
+    }
+    if (!config.tools.web) {
+      config.tools.web = {};
+    }
+    if (!config.tools.web.search) {
+      config.tools.web.search = {};
+    }
     const search = config.tools.web.search;
     if (!search.cacheTtlMinutes || search.cacheTtlMinutes < 360) {
       search.cacheTtlMinutes = 360;
@@ -279,7 +366,7 @@ for (const agent of ["kaytoo", "ap5", "threepio", "huyang", "villagence"]) {
 // Move LCM database to persistent volume if it landed in the ephemeral home dir
 const LCM_DB_EPHEMERAL = `${HOME_OPENCLAW}/lcm.db`;
 const LCM_DB_PERSISTENT = "/data/.openclaw/lcm.db";
-import { renameSync, copyFileSync } from "node:fs";
+import { copyFileSync } from "node:fs";
 if (existsSync(LCM_DB_EPHEMERAL) && !existsSync(LCM_DB_PERSISTENT)) {
   try {
     copyFileSync(LCM_DB_EPHEMERAL, LCM_DB_PERSISTENT);
@@ -305,8 +392,9 @@ if (existsSync(AGENTS_DIR)) {
     try {
       for (const entry of readdirSync(dir, { withFileTypes: true })) {
         const full = `${dir}/${entry.name}`;
-        if (entry.isDirectory()) cleanLocks(full);
-        else if (entry.name.endsWith(".lock")) {
+        if (entry.isDirectory()) {
+          cleanLocks(full);
+        } else if (entry.name.endsWith(".lock")) {
           unlinkSync(full);
           console.log(`[startup] removed stale lock: ${full}`);
         }
@@ -321,18 +409,27 @@ import { mkdirSync } from "node:fs";
 const TS_STATE_DIR = "/data/.tailscale";
 if (process.env.TS_AUTHKEY) {
   let tsInstalled = false;
-  try { execSync("which tailscale", { stdio: "ignore" }); tsInstalled = true; } catch {}
+  try {
+    execSync("which tailscale", { stdio: "ignore" });
+    tsInstalled = true;
+  } catch {}
 
   if (tsInstalled) {
     mkdirSync(TS_STATE_DIR, { recursive: true });
     mkdirSync("/var/run/tailscale", { recursive: true });
     console.log("[startup] starting tailscaled...");
     // Start tailscaled in background with userspace networking (no TUN device in Railway)
-    const tsd = spawn("tailscaled", [
-      "--tun=userspace-networking",
-      "--statedir", TS_STATE_DIR,
-      "--socket", "/var/run/tailscale/tailscaled.sock",
-    ], { stdio: "inherit", detached: true });
+    const tsd = spawn(
+      "tailscaled",
+      [
+        "--tun=userspace-networking",
+        "--statedir",
+        TS_STATE_DIR,
+        "--socket",
+        "/var/run/tailscale/tailscaled.sock",
+      ],
+      { stdio: "inherit", detached: true },
+    );
     tsd.unref();
 
     // Wait for tailscaled socket
@@ -340,7 +437,9 @@ if (process.env.TS_AUTHKEY) {
       try {
         execSync("tailscale status 2>/dev/null", { stdio: "ignore", timeout: 2000 });
         break;
-      } catch { await new Promise((r) => setTimeout(r, 1000)); }
+      } catch {
+        await new Promise((r) => setTimeout(r, 1000));
+      }
     }
 
     // Authenticate
@@ -349,22 +448,27 @@ if (process.env.TS_AUTHKEY) {
       console.log(`[startup] tailscale up --hostname=${hostname}...`);
       execSync(
         `tailscale up --authkey="${process.env.TS_AUTHKEY}" --hostname="${hostname}" --accept-routes`,
-        { stdio: "inherit", timeout: 30000 }
+        { stdio: "inherit", timeout: 30000 },
       );
       const ip = execSync("tailscale ip -4 2>/dev/null", { encoding: "utf8" }).trim();
       console.log(`[startup] tailscale connected: ${ip} (${hostname})`);
 
-      // Set up tailscale serve to proxy HTTPS to the gateway
-      execSync(`tailscale serve --bg --yes https+insecure://127.0.0.1:${PORT}`, {
-        stdio: "inherit",
-        timeout: 10000,
-      });
-      console.log(`[startup] tailscale serve active → https://${hostname}.tail987e19.ts.net/`);
+      // Defer tailscale serve until after the gateway starts — upstream v2026.3.12+
+      // detects active tailscale serve and refuses --bind lan (requires loopback).
+      // We need --bind lan for Railway health checks, so start serve after gateway.
+      globalThis.__tsServeCmd = `tailscale serve --bg --yes https+insecure://127.0.0.1:${PORT}`;
+      globalThis.__tsHostname = hostname;
     } catch (e) {
-      console.error("[startup] tailscale setup failed:", e.message, "(continuing without tailscale)");
+      console.error(
+        "[startup] tailscale setup failed:",
+        e.message,
+        "(continuing without tailscale)",
+      );
     }
   } else {
-    console.log("[startup] TS_AUTHKEY set but tailscale not installed (build with OPENCLAW_INSTALL_TAILSCALE=1)");
+    console.log(
+      "[startup] TS_AUTHKEY set but tailscale not installed (build with OPENCLAW_INSTALL_TAILSCALE=1)",
+    );
   }
 }
 
@@ -384,17 +488,23 @@ try {
 console.log(`[startup] starting gateway on port ${PORT}...`);
 const child = spawn(
   "node",
-  [
-    "/app/openclaw.mjs",
-    "gateway",
-    "--allow-unconfigured",
-    "--bind",
-    "lan",
-    "--port",
-    PORT,
-  ],
-  { stdio: "inherit" }
+  ["/app/openclaw.mjs", "gateway", "--allow-unconfigured", "--bind", "lan", "--port", PORT],
+  { stdio: "inherit" },
 );
 child.on("exit", (code) => process.exit(code ?? 1));
+
+// Deferred: start tailscale serve after the gateway is listening
+if (globalThis.__tsServeCmd) {
+  setTimeout(() => {
+    try {
+      execSync(globalThis.__tsServeCmd, { stdio: "inherit", timeout: 10000 });
+      console.log(
+        `[startup] tailscale serve active → https://${globalThis.__tsHostname}.tail987e19.ts.net/`,
+      );
+    } catch (e) {
+      console.error("[startup] tailscale serve failed:", e.message);
+    }
+  }, 15000); // 15s delay for gateway to start listening
+}
 process.on("SIGTERM", () => child.kill("SIGTERM"));
 process.on("SIGINT", () => child.kill("SIGINT"));
