@@ -294,6 +294,16 @@ if (existsSync(CONFIG)) {
       config.tools.web.search = {};
     }
     const search = config.tools.web.search;
+    // v2026.4.2: only `openaiCodex` is a valid scoped sub-key on tools.web.search.
+    // Strip legacy provider-scoped sub-keys (gemini, brave, google, etc.) that older
+    // openclaw versions wrote here; plugin-owned config now lives elsewhere.
+    for (const legacyKey of ["gemini", "brave", "google", "tavily", "duckduckgo", "bing"]) {
+      if (legacyKey in search) {
+        delete search[legacyKey];
+        console.log(`[startup] removed legacy tools.web.search.${legacyKey}`);
+        changed = true;
+      }
+    }
     if (!search.cacheTtlMinutes || search.cacheTtlMinutes < 360) {
       search.cacheTtlMinutes = 360;
       console.log("[startup] set web search cache TTL to 360 minutes");
