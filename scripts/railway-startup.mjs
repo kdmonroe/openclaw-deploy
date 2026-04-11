@@ -236,10 +236,14 @@ if (existsSync(CONFIG)) {
       }
     }
 
-    // Clear per-agent model overrides — all agents use the global default (minimax/MiniMax-M2.7)
+    // Clear per-agent model overrides — except Huyang, the generalist multi-coach
+    // agent that explicitly needs github-copilot/claude-opus-4.6. The historical
+    // ANTHROPIC_MODEL_ALIASES circular reference bug only triggered through
+    // agents.defaults model refs (cleared above), so allowing a single per-agent
+    // override here is safe.
     if (Array.isArray(config.agents?.list)) {
       for (const agent of config.agents.list) {
-        if (agent.model) {
+        if (agent.id !== "huyang" && agent.model) {
           console.log(
             `[startup] cleared model override for agent "${agent.id}": ${JSON.stringify(agent.model)}`,
           );

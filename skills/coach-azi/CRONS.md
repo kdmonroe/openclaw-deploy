@@ -1,5 +1,13 @@
 # AZI-3 Cron Jobs — Registration Guide
 
+> **Post-slim note (2026-04):** these jobs now run under the **Huyang** agent in
+> Multi-Coach Mode. Huyang reads `coach-azi/SKILL.md` and channels AZI-3's voice for
+> the duration of the turn. The schedules and message bodies are otherwise unchanged.
+> The `--agent` value is `huyang` and each `--message` is prefixed with
+> `Channel AZI-3 (🩺) — read coach-azi/SKILL.md and run this in AZI-3's voice. ...`.
+> If you ever need to re-register from scratch (e.g. after a `~/.openclaw/cron/jobs.json`
+> reset), copy the commands below as-is.
+
 ## How Cron Jobs Work in OpenClaw
 
 Cron jobs are **not** defined in files — they're registered at runtime via the gateway's cron scheduler. You register them using the `openclaw cron add` CLI command, which sends the job definition to the running gateway. The gateway persists jobs in `~/.openclaw/cron/jobs.json` and executes them on schedule.
@@ -9,7 +17,7 @@ Each job has:
 - **A schedule** — when to run (`--cron` for cron expressions, `--every` for intervals, `--at` for one-shots)
 - **A payload** — what to do (`--message` for isolated agent jobs, `--system-event` for main session events)
 - **Delivery** — where to send the output (`--announce --channel telegram`)
-- **An agent binding** — which agent runs the job (`--agent azi`)
+- **An agent binding** — which agent runs the job (`--agent huyang`)
 
 Jobs run in **isolated sessions** (their own context, separate from the main conversation) when using `--message`. The agent wakes up, runs the prompt, and optionally delivers the output to a channel.
 
@@ -23,7 +31,7 @@ Run these commands from any terminal with access to the gateway. If using a remo
 openclaw cron add \
   --name "AZI Morning Scan" \
   --description "Daily morning wellness check-in: sleep, movement goals, hydration" \
-  --agent azi \
+  --agent huyang \
   --cron "0 11 * * *" \
   --tz "UTC" \
   --message "Begin your response with a bold header line: **🩺 AZI-3 — Morning Scan**. Then proceed with: Run your morning wellness scan protocol. Check ontology for active health goals and recent HealthMetric entries. Ask about last night's sleep (hours + quality). Review today's movement goal. Set hydration target. Suggest one concrete health intention using habit stacking format. Stay in AZI-3 character. Keep to 3-4 sentences." \
@@ -37,7 +45,7 @@ openclaw cron add \
 openclaw cron add \
   --name "AZI Evening Review" \
   --description "End-of-day health review: celebrate wins, note gaps, set tomorrow's intention" \
-  --agent azi \
+  --agent huyang \
   --cron "0 2 * * *" \
   --tz "UTC" \
   --message "Begin your response with a bold header line: **🩺 AZI-3 — Evening Review**. Then proceed with: Run your evening review protocol. Check ontology for today's HealthMetric and DailyLog entries. Summarize today's health activity with specific numbers. Celebrate what was accomplished first. Note any gaps gently. Set tomorrow's intention. Suggest a wind-down activity (stretching, walking, breathing). Stay in AZI-3 character. 3-4 sentences." \
@@ -51,7 +59,7 @@ openclaw cron add \
 openclaw cron add \
   --name "AZI Weekly Summary" \
   --description "Weekly health review + Obsidian summary" \
-  --agent azi \
+  --agent huyang \
   --cron "0 0 * * 0" \
   --tz "UTC" \
   --message "Begin your response with a bold header line: **🩺 AZI-3 — Weekly Summary**. Then proceed with: Generate your weekly health summary. Review all HealthMetric and DailyLog entries from the past 7 days. Calculate averages: sleep hours, step count, hydration, workouts completed. Assess habit streaks — which are growing, which stalled. Write a structured markdown summary to Obsidian at periodic/weekly/[current ISO week]/coach-azi-summary.md using the obsidian skill. Then send a brief 4-5 sentence Telegram summary to the patient with highlights and one focus area for next week. AZI-3 character." \
