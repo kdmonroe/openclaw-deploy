@@ -236,6 +236,82 @@ if (existsSync(CONFIG)) {
       }
     }
 
+    // Slim retired coaches out of agents.list (Phase 1 of the Huyang generalist
+    // refactor). The personas live on as `coach-*` skill files that Huyang loads
+    // and channels via Multi-Coach Mode (see skills/coach-huyang/SKILL.md). The
+    // agent entries themselves are removed so they stop heartbeating and so any
+    // stale cron jobs targeting these agentIds become inert.
+    const RETIRED_AGENT_IDS = new Set(["azi", "kaytoo", "ap5", "threepio", "villagence"]);
+    if (Array.isArray(config.agents?.list)) {
+      const before = config.agents.list.length;
+      config.agents.list = config.agents.list.filter((agent) => {
+        if (RETIRED_AGENT_IDS.has(agent.id)) {
+          console.log(`[startup] removing retired coach agent "${agent.id}" from agents.list`);
+          return false;
+        }
+        return true;
+      });
+      if (config.agents.list.length !== before) {
+        changed = true;
+      }
+    }
+
+    // Ensure Huyang exists and has the generalist skill set (idempotent — if the
+    // gateway config was reset/regenerated we want Huyang back with the multi-coach
+    // skill list rather than the bare default).
+    if (Array.isArray(config.agents?.list)) {
+      let huyang = config.agents.list.find((a) => a.id === "huyang");
+      if (!huyang) {
+        huyang = {
+          id: "huyang",
+          name: "Huyang",
+          identity: { name: "Professor Huyang", emoji: "⚔️" },
+          heartbeat: {
+            every: "2h",
+            activeHours: { start: "09:00", end: "21:00", timezone: "America/New_York" },
+            target: "telegram",
+          },
+        };
+        config.agents.list.push(huyang);
+        console.log("[startup] added missing huyang agent");
+        changed = true;
+      }
+      const desiredSkills = [
+        "workspace-files",
+        "cron-manager",
+        "self-improving",
+        "ontology",
+        "obsidian",
+        "obsidian-direct",
+        "weather",
+        "apple-notes",
+        "things-mac",
+        "monday",
+        "github",
+        "gog",
+        "coding-agent",
+        "tavily-search",
+        "playwright-mcp",
+        "playwright-scraper-skill",
+        "linear",
+        "coach-huyang",
+        "coach-azi",
+        "coach-kaytoo",
+        "coach-ap5",
+        "coach-threepio",
+        "coach-villagence",
+      ];
+      const currentSkills = Array.isArray(huyang.skills) ? huyang.skills : [];
+      const missingSkills = desiredSkills.filter((s) => !currentSkills.includes(s));
+      if (missingSkills.length) {
+        huyang.skills = [...currentSkills, ...missingSkills];
+        console.log(
+          `[startup] added ${missingSkills.length} skills to huyang: ${missingSkills.join(", ")}`,
+        );
+        changed = true;
+      }
+    }
+
     // Clear per-agent model overrides — except Huyang, the generalist multi-coach
     // agent that explicitly needs github-copilot/claude-opus-4.6. The historical
     // ANTHROPIC_MODEL_ALIASES circular reference bug only triggered through
@@ -249,6 +325,17 @@ if (existsSync(CONFIG)) {
           );
           delete agent.model;
         }
+      }
+      // Ensure Huyang has the opus model override (idempotent — restores it if
+      // a config regeneration ever wiped it).
+      const huyang = config.agents.list.find((a) => a.id === "huyang");
+      if (huyang && !huyang.model) {
+        huyang.model = {
+          primary: "github-copilot/claude-opus-4.6",
+          fallbacks: ["github-copilot/claude-sonnet-4.5"],
+        };
+        console.log("[startup] restored huyang model override (opus primary, sonnet fallback)");
+        changed = true;
       }
       changed = true;
     }
