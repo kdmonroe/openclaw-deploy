@@ -356,32 +356,21 @@ if (existsSync(CONFIG)) {
       }
     }
 
-    // Clear per-agent model overrides — except Huyang, the generalist multi-coach
-    // agent that explicitly needs github-copilot/claude-opus-4.6. The historical
-    // ANTHROPIC_MODEL_ALIASES circular reference bug only triggered through
-    // agents.defaults model refs (cleared above), so allowing a single per-agent
-    // override here is safe.
+    // Clear ALL per-agent model overrides — everyone uses the global default
+    // (github-copilot/claude-haiku-4.5, enforced above). Opus and other models
+    // are available in the catalog for on-demand selection via /model in Telegram.
+    // Per-agent overrides caused all 44 Huyang cron jobs to burn opus turns for
+    // routine coach pings.
     if (Array.isArray(config.agents?.list)) {
       for (const agent of config.agents.list) {
-        if (agent.id !== "huyang" && agent.model) {
+        if (agent.model) {
           console.log(
             `[startup] cleared model override for agent "${agent.id}": ${JSON.stringify(agent.model)}`,
           );
           delete agent.model;
+          changed = true;
         }
       }
-      // Ensure Huyang has the opus model override (idempotent — restores it if
-      // a config regeneration ever wiped it).
-      const huyang = config.agents.list.find((a) => a.id === "huyang");
-      if (huyang && !huyang.model) {
-        huyang.model = {
-          primary: "github-copilot/claude-opus-4.6",
-          fallbacks: ["github-copilot/claude-sonnet-4.5"],
-        };
-        console.log("[startup] restored huyang model override (opus primary, sonnet fallback)");
-        changed = true;
-      }
-      changed = true;
     }
 
     // Clear channel-specific model overrides
