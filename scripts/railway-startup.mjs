@@ -218,22 +218,66 @@ if (existsSync(CONFIG)) {
       changed = true;
     }
 
-    // Clear agents.defaults model refs — model refs in config trigger the
-    // ANTHROPIC_MODEL_ALIASES circular reference bug during config loading.
-    // The source code defaults (DEFAULT_PROVIDER=minimax, DEFAULT_MODEL=MiniMax-M2.7)
-    // handle the fallback when config has no model set.
-    if (config.agents?.defaults) {
-      const cleared = [];
-      for (const key of ["model", "imageModel", "pdfModel"]) {
-        if (config.agents.defaults[key]) {
-          delete config.agents.defaults[key];
-          cleared.push(key);
-        }
-      }
-      if (cleared.length) {
-        console.log("[startup] cleared stale model refs from agents.defaults:", cleared.join(", "));
-        changed = true;
-      }
+    // Enforce agents.defaults model config — GitHub Copilot haiku as the global
+    // default (cheap, fast), with the full Anthropic + OpenAI model catalog
+    // available in the Telegram /models picker.
+    //
+    // Previously this block stripped agents.defaults.model to avoid the
+    // ANTHROPIC_MODEL_ALIASES circular reference bug in v2026.3.12. That bug
+    // is resolved in v2026.4.2, so we now explicitly set the desired defaults.
+    if (!config.agents) {
+      config.agents = {};
+    }
+    if (!config.agents.defaults) {
+      config.agents.defaults = {};
+    }
+    const desiredDefault = {
+      primary: "github-copilot/claude-haiku-4.5",
+      fallbacks: ["minimax/MiniMax-M2.5"],
+    };
+    if (
+      config.agents.defaults.model?.primary !== desiredDefault.primary ||
+      JSON.stringify(config.agents.defaults.model?.fallbacks) !==
+        JSON.stringify(desiredDefault.fallbacks)
+    ) {
+      config.agents.defaults.model = desiredDefault;
+      console.log(
+        `[startup] set agents.defaults.model: ${desiredDefault.primary} (fallback: ${desiredDefault.fallbacks.join(", ")})`,
+      );
+      changed = true;
+    }
+
+    // Model catalog — all models that appear in the Telegram /models picker.
+    // Keyed by provider/model-id. GitHub Copilot models route through Copilot
+    // auth (GH_TOKEN); direct anthropic/openai require their own API keys.
+    const desiredModels = {
+      // GitHub Copilot (routed Anthropic — uses GH_TOKEN, no separate API key)
+      "github-copilot/claude-haiku-4.5": { alias: "haiku" },
+      "github-copilot/claude-sonnet-4.5": { alias: "sonnet" },
+      "github-copilot/claude-opus-4.6": { alias: "opus" },
+      // Direct Anthropic (requires ANTHROPIC_API_KEY)
+      "anthropic/claude-opus-4-6": {},
+      "anthropic/claude-sonnet-4-6": {},
+      "anthropic/claude-haiku-4-5": {},
+      // OpenAI (requires OPENAI_API_KEY)
+      "openai/gpt-5.4": { alias: "gpt" },
+      "openai/gpt-5-mini": { alias: "gpt-mini" },
+      "openai/o3": {},
+      "openai/o4-mini": {},
+      // MiniMax (requires MINIMAX_API_KEY)
+      "minimax/MiniMax-M2.5": {},
+      "minimax/MiniMax-M2.7": {},
+      "minimax/MiniMax-VL-01": {},
+    };
+    const currentModels = config.agents.defaults.models || {};
+    const modelKeys = Object.keys(desiredModels);
+    const missingModels = modelKeys.filter((k) => !currentModels[k]);
+    if (missingModels.length) {
+      config.agents.defaults.models = { ...currentModels, ...desiredModels };
+      console.log(
+        `[startup] added ${missingModels.length} models to catalog: ${missingModels.join(", ")}`,
+      );
+      changed = true;
     }
 
     // Slim retired coaches out of agents.list (Phase 1 of the Huyang generalist
